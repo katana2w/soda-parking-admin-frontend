@@ -1,0 +1,783 @@
+import {Component, OnInit, AfterViewInit, ViewChild, ElementRef} from '@angular/core';
+import {FormBuilder, FormGroup, FormControl, Validators} from '@angular/forms';
+
+import {LineService} from '../_services';
+import {ApiService} from '../_services';
+
+import {Line} from '../shared/types';
+
+import {MatDialog, MatDialogConfig} from '@angular/material/dialog';
+import {DialogMessageComponent} from '../dialog-message/dialog-message.component';
+@Component({
+  selector: 'app-google-map',
+  templateUrl: './google-map.component.html',
+  styleUrls: ['./google-map.component.less']
+})
+export class GoogleMapComponent implements OnInit, AfterViewInit {
+  @ViewChild('mapContainer', {static: false}) gmap: ElementRef;
+  map: google.maps.Map;
+  // lat: 47.49219219532645;
+  // lng: 19.05507372045515;
+  marker1: any;
+  marker2: any;
+  markersStartEnd: Array<any> = [];
+  parkingCircleArray: Array<any> = [];
+  parkingPlaces: Array<any> = [];
+  // filteredStreets: Observable<string[]>;
+  // control = new FormControl();
+  listOfStreets: string[] = [];
+  parkingCircleObjects: any = {};
+  selectedLineObject: Line;
+  selectedPolylineObject: any;
+  // viewportPolygon: any;
+  selectedLineScanners: [];
+  linesSavedArray: Array<Line> = null;
+
+  defaultColors = {
+    selectedLine: {
+      lineColor: 'red',
+      scannerColor: 'red',
+    },
+    defaultLine: {
+      lineColor: 'blue',
+      scannerColor: 'orange',
+    },
+    unselectedScanners: 'green'
+  };
+  isNewLine = false;
+  isPreview = false;
+  isEditLine = false;
+  toleranceLineForm = 1;
+  toleranceLineMeterForm = '2m';
+  startPointForm = {};
+  endPointForm = {};
+  selectedPlacesForm = [];
+  toleranceParamStart = 2;
+  registered = false;
+  submittedSave = false;
+  submittedEdit = false;
+  zoomLevel: number;
+  geocoder: any;
+  private saveLineForm: FormGroup;
+  private editLineForm: FormGroup;
+  onClickChangeSelectedLine = this.clickChangeSelectedLine.bind(this);
+
+  constructor(
+    public lineService: LineService,
+    private apiService: ApiService,
+    private formBuilder: FormBuilder,
+    public dialog: MatDialog
+  ) {
+    this.saveLineForm = new FormGroup({
+      lineName: new FormControl(),
+      control: new FormControl(),
+      toleranceLineForm: new FormControl(),
+      toleranceLineMeterForm: new FormControl(),
+    });
+    this.editLineForm = new FormGroup({
+      lineName: new FormControl(),
+      toleranceLineForm: new FormControl(),
+      toleranceLineMeterForm: new FormControl(),
+      // _id: new FormControl(),
+    });
+  }
+
+  async ngOnInit() {
+    await Promise.all([
+      // this.lineService.loadLinesList(),
+      this.lineService.loadScannersList(),
+    ]);
+    this.apiService.getAllScannersFromUrl().subscribe(data => {
+      console.log(data.response);
+      this.parkingPlaces = data.response;
+      this.getParkingPoints();
+      this.apiService.getLinesFromDb().subscribe(resp => {
+        // this.allLines = resp.allLinesObject;
+        console.log(resp.allLinesObject);
+        this.linesSavedArray = resp.allLinesObject;
+        this.createAllLinesOnMap();
+      });
+    });
+    this.saveLineForm = this.formBuilder.group({
+      lineName: ['', Validators.required],
+      toleranceLineForm: [1, Validators.required],
+      toleranceLineMeterForm: ['2m'],
+    });
+    this.map.addListener('zoom_changed', () => {
+      this.zoomLevel = this.map.getZoom();
+      console.log('this.zoomLevel', this.zoomLevel);
+    });
+
+    // this.filteredStreets = this.saveLineForm.controls.control.valueChanges.pipe(
+    //   startWith(''),
+    //   map(value => this._filter(value))
+    // );
+    // @ts-ignore
+    google.maps.Polyline.prototype.getBounds = function() {
+      const bounds = new google.maps.LatLngBounds();
+      // tslint:disable-next-line:only-arrow-functions
+      this.getPath().forEach((item, index) => {
+        bounds.extend(new google.maps.LatLng(item.lat(), item.lng()));
+      });
+      return bounds;
+    };
+  }
+
+  // private _filter(value: string): string[] {
+  //   const filterValue = this._normalizeValue(value);
+  //   return this.streets.filter(street => this._normalizeValue(street).includes(filterValue));
+  // }
+  //
+  // private _normalizeValue(value: string): string {
+  //   return value.toLowerCase().replace(/\s/g, '');
+  // }
+
+  ngAfterViewInit(): void {
+    this.mapInitializer();
+  }
+
+  mapInitializer(): void {
+    this.map = new google.maps.Map(this.gmap.nativeElement, {
+      zoom: 19,
+      center: {
+        lat: 47.49219219532645,
+        lng: 19.05507372045515,
+      },
+    });
+    this.map.setOptions({
+      styles: [
+        {
+          featureType: 'poi.business',
+          stylers: [{visibility: 'off'}],
+        },
+        {
+          featureType: 'transit',
+          elementType: 'labels.icon',
+          stylers: [{visibility: 'off'}],
+        },
+      ]
+    });
+    this.setMapOnAll(null);
+    this.geocoder = new google.maps.Geocoder();
+  }
+
+  geocodeLatLng(): void {
+    this.geocoder.geocode({location: this.marker1.getPosition()}, (results, status) => {
+      if (status === 'OK') {
+        // tslint:disable-next-line:max-line-length
+        this.listOfStreets = results.filter(item => item.types.includes('street_address')).map(it => it.address_components.filter(tt => tt.types.includes('route'))).map(kk => kk[0].long_name);
+        // this.filteredStreets = this.control.valueChanges.pipe(
+        //   startWith(''),
+        //   map(value => this._filter(value))
+        // );
+      } else {
+        console.log('Geocoder failed due to: ' + status);
+      }
+    });
+  }
+
+  setMapOnAll(map): void {
+    if (this.markersStartEnd && this.markersStartEnd.length) {
+      // tslint:disable-next-line:prefer-for-of
+      for (let i = 0; i < this.markersStartEnd.length; i++) {
+        this.markersStartEnd[i].setMap(map);
+      }
+    }
+  }
+
+  createAllLinesOnMap(linesArray = this.linesSavedArray): void {
+    linesArray.forEach(line => {
+      this.createLineBasedObject(line);
+    });
+  }
+
+  createLineBasedObject(line: Line): void {
+    // @ts-ignore
+    const newLine = new google.maps.Polyline({
+      map: this.map,
+      path: [line.lineCoordinates.start, line.lineCoordinates.end],
+      strokeColor: this.defaultColors.defaultLine.lineColor,
+      strokeOpacity: 1.0,
+      strokeWeight: 12
+    });
+    newLine.addListener('click', this.onClickChangeSelectedLine.bind(null, event, newLine, line, line.lineScanners));
+    line.lineScanners.forEach((scanner: any) => {
+      const idParking = scanner.ParkingPlaceId;
+      // @ts-ignore
+      const circle = this.parkingCircleObjects[idParking];
+      if (circle) {
+        // tslint:disable-next-line:max-line-length
+        circle.setOptions({
+          fillColor: this.defaultColors.defaultLine.scannerColor,
+          strokeColor: this.defaultColors.defaultLine.scannerColor
+        });
+        circle.addListener('click', this.onClickChangeSelectedLine.bind(null, event, newLine, line, line.lineScanners));
+      }
+    });
+  }
+
+  onAddNewLine(): void {
+    this.isPreview = false;
+    this.isNewLine = true;
+    this.makeSelectedLineDefaultColors();
+    this.clearSelectedLineObjects();
+    this.emptySelectedObjects();
+    this.newLineOnMap2();
+  }
+
+  onCancelLine(): void {
+    this.isNewLine = false;
+    this.isPreview = false;
+    this.isEditLine = false;
+    if (this.marker1) {
+      google.maps.event.clearInstanceListeners(this.marker1);
+    }
+    if (this.marker2) {
+      google.maps.event.clearInstanceListeners(this.marker2);
+    }
+    google.maps.event.clearInstanceListeners(this.map);
+    this.deleteMarkers();
+    this.makeSelectedLineDefaultColors();
+
+  }
+
+  onCancelSaveLine(): void {
+    this.isNewLine = false;
+    this.isPreview = false;
+    this.isEditLine = false;
+    if (this.marker1) {
+      google.maps.event.clearInstanceListeners(this.marker1);
+    }
+    if (this.marker2) {
+      google.maps.event.clearInstanceListeners(this.marker2);
+    }
+    google.maps.event.clearInstanceListeners(this.map);
+    this.deleteMarkers();
+    this.clearPolyline();
+    this.deleteLineAndPassDefaultColor();
+  }
+  newLineOnMap2(): void {
+    // map onclick listener
+    this.map.addListener('click', (e) => {
+      // console.log(e);
+      if (this.markersStartEnd && this.markersStartEnd.length > 0 && this.markersStartEnd.length < 2) {
+        this.marker2 = new google.maps.Marker({
+          map: this.map,
+          position: e.latLng,
+          draggable: true
+        });
+
+        // add listener to redraw the polyline when markers position change
+        this.marker2.addListener('position_changed', () => {
+          this.drawPolyline();
+        });
+
+        // store the marker object drawn in global array
+        this.markersStartEnd.push(this.marker2);
+        // drawPolyline();
+      }
+      if (!this.markersStartEnd || this.markersStartEnd.length < 1) {
+        this.marker1 = new google.maps.Marker({
+          map: this.map,
+          position: e.latLng,
+          draggable: true
+        });
+
+        // add listener to redraw the polyline when markers position change
+        this.marker1.addListener('position_changed', () => {
+          this.drawPolyline();
+        });
+
+        // store the marker object drawn in global array
+        this.markersStartEnd.push(this.marker1);
+        // drawPolyline();
+        this.geocodeLatLng();
+      }
+      this.drawPolyline();
+    });
+  }
+
+  // define function to draw polyline that connect markers' position
+  drawPolyline(): void {
+    debugger;
+    const markersPositionArray = [];
+    // obtain latlng of all markers on map
+    this.markersStartEnd.forEach((e) => {
+      markersPositionArray.push(e.getPosition());
+    });
+
+    // check if there is already polyline drawn on map
+    // remove the polyline from map before we draw new one
+    if (this.selectedPolylineObject) {
+      console.log('0');
+
+      this.selectedPolylineObject.setMap(null);
+    }
+
+    // draw new polyline at markers' position
+    this.selectedPolylineObject = new google.maps.Polyline({
+      map: this.map,
+      path: markersPositionArray,
+      strokeColor: this.defaultColors.selectedLine.lineColor,
+      strokeOpacity: 1.0,
+      strokeWeight: 12,
+    });
+    if (this.marker1) {
+      this.startPointForm = String(this.marker1.getPosition());
+    }
+    if (this.marker2) {
+      this.endPointForm = String(this.marker2.getPosition());
+    }
+    if (this.marker1 && this.marker2) {
+      this.sizeTolerance();
+    }
+  }
+
+  getParkingPoints(): void {
+    this.parkingPlaces.forEach((item) => {
+      const lat = item.GpsCoordinates.Latitude;
+      const lng = item.GpsCoordinates.Longitude;
+      const idParking = item.ParkingPlaceId;
+      // @ts-ignore
+      const cityCircle = new google.maps.Circle({
+        strokeColor: this.defaultColors.unselectedScanners,
+        strokeOpacity: 1,
+        strokeWeight: 2,
+        fillColor: this.defaultColors.unselectedScanners,
+        fillOpacity: 1,
+        map: this.map,
+        // id: idParking,
+        center: {lat, lng},
+        radius: 1,
+      });
+      this.parkingCircleArray.push(cityCircle);
+      this.parkingCircleObjects[item.ParkingPlaceId] = cityCircle;
+    });
+  }
+
+  sizeTolerance(): void {
+    let res;
+    if (this.isNewLine) {
+      res = this.saveLineForm.getRawValue().toleranceLineForm;
+    }
+    if (this.isEditLine) {
+      res = this.editLineForm.getRawValue().toleranceLineForm;
+    }
+    const resSelectedLine = this.selectedLineObject && this.selectedLineObject.lineTolerance;
+    // ? this.saveLineForm.getRawValue().toleranceLineForm : this.selectedLineObject.lineTolerance;
+    const resFinal = res || resSelectedLine || 1;
+    const toleranceL = resFinal * 0.000025;
+    this.toleranceLineMeterForm = ((this.toleranceParamStart * resFinal) + 'm').toString();
+    this.selectedPlacesForm = [];
+    if (this.selectedLineObject) {
+      this.selectedLineObject.lineCoordinates.start.lat = this.marker1.getPosition().lat();
+      this.selectedLineObject.lineCoordinates.start.lng = this.marker1.getPosition().lng();
+      this.selectedLineObject.lineCoordinates.end.lat = this.marker2.getPosition().lat();
+      this.selectedLineObject.lineCoordinates.end.lng = this.marker2.getPosition().lng();
+      this.selectedLineObject.lineTolerance = this.toleranceParamStart * parseInt(String(resFinal), 2);
+      this.selectedLineObject.lineScanners = [];
+      this.selectedLineObject.lineScannersOnMap = [];
+    } else {
+      this.selectedLineObject = {
+        lineCoordinates: {
+          start: {
+            lat: this.marker1.getPosition().lat(),
+            lng: this.marker1.getPosition().lng()
+          },
+          end: {
+            lat: this.marker2.getPosition().lat(),
+            lng: this.marker2.getPosition().lng()
+          }
+        },
+        lineName: '',
+        _id: null,
+        lineTolerance: this.toleranceParamStart * parseInt(String(resFinal), 2),
+        linePoly: this.selectedPolylineObject,
+        marker1: this.marker1,
+        marker2: this.marker2,
+        lineScanners: [],
+        lineScannersOnMap: []
+      };
+    }
+
+    this.parkingPlaces.forEach((item: any) => {
+      const lat = item.GpsCoordinates.Latitude;
+      const lng = item.GpsCoordinates.Longitude;
+      const isLocationNear = google.maps.geometry.poly.isLocationOnEdge(
+        new google.maps.LatLng(parseFloat(lat), parseFloat(lng)),
+        this.selectedPolylineObject,
+        toleranceL
+      );
+      const circle = this.parkingCircleObjects[item.ParkingPlaceId];
+      if (isLocationNear) {
+        if (circle) {
+          // tslint:disable-next-line:max-line-length
+          circle.setOptions({
+            fillColor: this.defaultColors.selectedLine.scannerColor,
+            strokeColor: this.defaultColors.selectedLine.scannerColor
+          });
+        }
+        this.selectedLineObject.lineScanners.push(item);
+        this.selectedLineObject.lineScannersOnMap.push(circle);
+
+        this.selectedPlacesForm.push(lat.toString() + ', ' + lng.toString());
+      } else {
+        if (circle.strokeColor === 'red' && circle.fillColor === 'red') {
+          circle.setOptions({
+            fillColor: this.defaultColors.unselectedScanners,
+            strokeColor: this.defaultColors.unselectedScanners
+          });
+        }
+      }
+    });
+  }
+
+  deleteLineAndPassDefaultColor(): void {
+    if (this.selectedLineObject && this.selectedLineObject.lineScanners && this.selectedLineObject.lineScanners.length > 0) {
+      this.selectedLineObject.lineScanners.forEach((scanner: any) => {
+        const idParking = scanner.ParkingPlaceId;
+        const circle = this.parkingCircleObjects[idParking];
+        if (circle) {
+          // tslint:disable-next-line:max-line-length
+          circle.setOptions({
+            fillColor: this.defaultColors.unselectedScanners,
+            strokeColor: this.defaultColors.unselectedScanners
+          });
+        }
+      });
+    }
+    this.selectedPolylineObject = null;
+    this.selectedLineScanners = null;
+    this.selectedLineObject = null;
+  }
+
+  makeSelectedLineDefaultColors(): void {
+    if (this.selectedPolylineObject) {
+      // tslint:disable-next-line:max-line-length
+      this.selectedPolylineObject.setOptions({
+        fillColor: this.defaultColors.defaultLine.lineColor,
+        strokeColor: this.defaultColors.defaultLine.lineColor
+      });
+    }
+    if (this.selectedLineScanners && this.selectedLineScanners.length > 0) {
+      this.selectedLineScanners.forEach((scanner: any) => {
+        const idParking = scanner.ParkingPlaceId;
+        const circle = this.parkingCircleObjects[idParking];
+        if (circle) {
+          // tslint:disable-next-line:max-line-length
+          circle.setOptions({
+            fillColor: this.defaultColors.defaultLine.scannerColor,
+            strokeColor: this.defaultColors.defaultLine.scannerColor
+          });
+        }
+      });
+    }
+    this.selectedPolylineObject = null;
+    this.selectedLineScanners = null;
+    this.selectedLineObject = null;
+  }
+
+  clickChangeSelectedLine(param1: any, polyLine: any, line: Line, lineScanners: []): void {
+    debugger;
+    if (this.selectedPolylineObject) {
+      this.selectedPolylineObject.setOptions({
+        fillColor: this.defaultColors.defaultLine.lineColor,
+        strokeColor: this.defaultColors.defaultLine.lineColor
+      });
+    }
+    if (this.selectedLineScanners && this.selectedLineScanners.length > 0) {
+      this.selectedLineScanners.forEach((scanner: any) => {
+        const idParking = scanner.ParkingPlaceId;
+        const circle = this.parkingCircleObjects[idParking];
+        if (circle) {
+          circle.setOptions({
+            fillColor: this.defaultColors.defaultLine.scannerColor,
+            strokeColor: this.defaultColors.defaultLine.scannerColor
+          });
+        }
+      });
+    }
+    this.isPreview = true;
+    this.selectedLineScanners = lineScanners;
+    this.selectedPolylineObject = polyLine;
+    this.selectedLineObject = line;
+    polyLine.setOptions({strokeColor: this.defaultColors.selectedLine.lineColor});
+    lineScanners.forEach((scanner: any) => {
+      const idParking = scanner.ParkingPlaceId;
+      const circle = this.parkingCircleObjects[idParking];
+      if (circle) {
+        circle.setOptions({
+          fillColor: this.defaultColors.selectedLine.scannerColor,
+          strokeColor: this.defaultColors.selectedLine.scannerColor
+        });
+      }
+    });
+    this.selectedLineScanners = lineScanners;
+    this.selectedPolylineObject = polyLine;
+    this.selectedLineObject = line;
+    // polyLine.setMap(null);
+    // polyLine = null;
+  }
+
+  // Removes the markers from the map, but keeps them in the array.
+  clearMarkers(): void {
+    this.setMapOnAll(null);
+  }
+
+  // Removes polyline from the map
+  clearPolyline() {
+    this.selectedPolylineObject.setMap(null);
+  }
+
+  // Clear all selected objects
+  clearSelectedLineObjects() {
+    if (this.selectedLineScanners && this.selectedLineScanners.length) {
+      this.selectedLineScanners.forEach((scanner: any) => {
+        const idParking = scanner.ParkingPlaceId;
+        const circle = this.parkingCircleObjects[idParking];
+        if (circle) {
+          // tslint:disable-next-line:max-line-length
+          circle.setOptions({
+            fillColor: this.defaultColors.unselectedScanners,
+            strokeColor: this.defaultColors.unselectedScanners
+          });
+        }
+      });
+    }
+    this.selectedPolylineObject = null;
+    this.selectedLineObject = null;
+    this.selectedLineScanners = null;
+    this.selectedPlacesForm = null;
+  }
+
+  emptySelectedObjects() {
+    this.saveLineForm.setValue({
+      lineName: '',
+      toleranceLineForm: 1,
+      toleranceLineMeterForm: '2m'
+    });
+    this.startPointForm = {};
+    this.endPointForm = {};
+    this.selectedPlacesForm = [];
+  }
+
+  // Deletes all markers in the array by removing references to them.
+  deleteMarkers(): void {
+    console.log('deleteMarkers');
+    this.marker1 = null;
+    this.marker2 = null;
+    this.clearMarkers();
+    this.markersStartEnd = [];
+  }
+
+  formatLineObject() {
+    debugger;
+    this.selectedLineObject.lineCoordinates.start.lat = this.marker1.getPosition().lat();
+    this.selectedLineObject.lineCoordinates.start.lng = this.marker1.getPosition().lng();
+    this.selectedLineObject.lineCoordinates.end.lat = this.marker2.getPosition().lat();
+    this.selectedLineObject.lineCoordinates.end.lng = this.marker2.getPosition().lng();
+
+    if (this.isEditLine) {
+      this.selectedLineObject.lineName = this.editLineForm.value.lineName;
+      this.selectedLineObject.lineTolerance = this.editLineForm.value.toleranceLineForm;
+    }
+    if (this.isNewLine) {
+      this.selectedLineObject.lineName = this.saveLineForm.value.lineName;
+      this.selectedLineObject.lineTolerance = this.saveLineForm.value.toleranceLineForm;
+    }
+    this.selectedLineObject.linePoly = null;
+    // this.selectedLineObject.marker1 = this.marker1;
+    // this.selectedLineObject.marker2 = this.marker2;
+    this.selectedLineObject.marker1 = {
+      lat: this.marker1.getPosition().lat(),
+      lng: this.marker1.getPosition().lng()
+    };
+    this.selectedLineObject.marker2 = {
+      lat: this.marker2.getPosition().lat(),
+      lng: this.marker2.getPosition().lng()
+    };
+
+    this.linesSavedArray.push(this.selectedLineObject);
+
+    this.selectedLineObject.lineScannersOnMap = null;
+    this.selectedPolylineObject = null;
+    // google.maps.event.clearInstanceListeners(this.marker1);
+    // google.maps.event.clearInstanceListeners(this.marker2);
+    // google.maps.event.clearInstanceListeners(this.map);
+    console.log('selectedLineObject', this.selectedLineObject);
+    // this.sendLineObjectToDb(this.selectedLineObject);
+    // this.deleteMarkers();
+    // this.isNewLine = false;
+  }
+
+  onEditLine(): void {
+    debugger;
+    this.isPreview = false;
+    this.isNewLine = false;
+    this.isEditLine = true;
+    const {lineCoordinates: {start}} = this.selectedLineObject;
+    const {lineCoordinates: {end}} = this.selectedLineObject;
+    this.editLineForm = this.formBuilder.group({
+      lineName: [this.selectedLineObject.lineName, Validators.required],
+      toleranceLineForm: [this.selectedLineObject.lineTolerance, Validators.required],
+      toleranceLineMeterForm: [((this.toleranceParamStart * this.selectedLineObject.lineTolerance) + 'm').toString()],
+      _id: [this.selectedLineObject._id, Validators.required],
+    });
+    // @ts-ignore
+    this.editLineForm.setValue({
+      _id: this.selectedLineObject._id,
+      lineName: this.selectedLineObject.lineName,
+      toleranceLineForm: this.selectedLineObject.lineTolerance,
+      toleranceLineMeterForm: ((this.toleranceParamStart * this.selectedLineObject.lineTolerance) + 'm').toString()
+    });
+    this.toleranceLineMeterForm = ((this.toleranceParamStart * this.selectedLineObject.lineTolerance) + 'm').toString();
+    this.toleranceLineForm = this.selectedLineObject.lineTolerance;
+    this.marker1 = new google.maps.Marker({
+      map: this.map,
+      draggable: true,
+      position: {
+        lat: start.lat,
+        lng: start.lng
+      },
+    });
+    this.markersStartEnd.push(this.marker1);
+    this.marker2 = new google.maps.Marker({
+      map: this.map,
+      draggable: true,
+      position: {
+        lat: end.lat,
+        lng: end.lng
+      },
+    });
+    if (this.selectedPolylineObject) {
+      this.selectedPolylineObject.setMap(null);
+    }
+    if (this.marker1) {
+      this.startPointForm = String(this.marker1.getPosition());
+    }
+    if (this.marker2) {
+      this.endPointForm = String(this.marker2.getPosition());
+    }
+
+    this.markersStartEnd.push(this.marker2);
+    this.marker1.addListener('position_changed', () => {
+      this.drawPolyline();
+    });
+    this.marker2.addListener('position_changed', () => {
+      this.drawPolyline();
+    });
+    if (this.selectedPolylineObject) {
+      this.selectedPolylineObject.setOptions({strokeColor: this.defaultColors.selectedLine.lineColor});
+    }
+    this.drawPolyline();
+    this.sizeTolerance();
+  }
+
+  onSubmitSave() {
+    this.submittedSave = true;
+
+    if (this.saveLineForm.invalid === true) {
+      return;
+    } else {
+      this.formatLineObject();
+      this.registered = true;
+      this.apiService.saveLineDb(this.selectedLineObject).subscribe(data => {
+        if (data.message === 'Ok') {
+          this.deleteMarkers();
+          this.createAllLinesOnMap([data.result]);
+          this.isNewLine = false;
+          this.isPreview = true;
+        } else if (data.message === 'Error') {
+          if (data.err.keyPattern.lineName) {
+            this.openDialog(`Line with name "${data.err.keyValue.lineName}" already exists!`);
+          }
+        }
+        },
+        error => {
+          console.log('err', error);
+        });
+    }
+  }
+
+  onSubmitEdit() {
+    this.submittedEdit = true;
+
+    if (this.editLineForm.invalid === true) {
+      return;
+    } else {
+      this.formatLineObject();
+      this.registered = true;
+      this.apiService.saveEditLineDb(this.selectedLineObject).subscribe(data => {
+        this.apiService.getLinesFromDb().subscribe(resp => {
+          this.isEditLine = false;
+          // this.clearPolyline();
+          this.deleteMarkers();
+          this.clearSelectedLineObjects();
+          this.linesSavedArray = resp.allLinesObject;
+          this.createAllLinesOnMap();
+        });
+        // this.deleteMarkers();
+        // this.createAllLinesOnMap([data.result]);
+        // this.isEditLine = false;
+      });
+    }
+  }
+
+  onRemoveLine(): void {
+    if (this.selectedLineObject._id) {
+      this.apiService.removeLineFromDb(this.selectedLineObject).subscribe(data => {
+        this.apiService.getLinesFromDb().subscribe(resp => {
+          this.isPreview = false;
+          this.clearPolyline();
+          this.deleteMarkers();
+          this.clearSelectedLineObjects();
+          this.linesSavedArray = resp.allLinesObject;
+          this.createAllLinesOnMap();
+        });
+      });
+    }
+  }
+
+  onSetCenterMap(): void {
+    this.map.setCenter(new google.maps.LatLng(47.49219219532645, 19.05507372045515));
+  }
+
+  openDialog(textMessage) {
+    const dialogConfig = new MatDialogConfig();
+
+    dialogConfig.disableClose = false;
+    dialogConfig.autoFocus = true;
+    dialogConfig.data = {
+      id: 1,
+      title: 'Angular For Beginners',
+      description: textMessage
+    };
+    dialogConfig.position = {
+      top: '0',
+      left: '0'
+    };
+    const dialogRef = this.dialog.open(DialogMessageComponent, dialogConfig);
+
+    dialogRef.afterClosed().subscribe(result => {
+      console.log(`Dialog result: ${result}`);
+    });
+
+    dialogRef.afterClosed().subscribe(
+      data => console.log('Dialog output:', data)
+    );
+  }
+
+  onGetCenterMap(): void {
+    debugger
+    const bnds = this.map.getBounds();
+    // console.log(this.map.getBounds());
+    // console.log(this.map.getZoom());
+    // console.log(this.map.getProjection());
+    const poly = this.selectedPolylineObject.getBounds();
+    console.log('checking', bnds.intersects(poly));
+    // tslint:disable-next-line:max-line-length
+    this.apiService.getLinesLatLngFromDb(bnds.getNorthEast().lat(), bnds.getNorthEast().lng(), bnds.getSouthWest().lat(), bnds.getSouthWest().lng()).subscribe(resp => {
+      console.log('1');
+    });
+  }
+}

@@ -1,0 +1,103 @@
+<div #mapContainer id="map"></div>
+<div class="floating-panel">
+  <form *ngIf="isNewLine" [formGroup]="saveLineForm" (ngSubmit)="onSubmitSave()">
+    <div class="parent-div-class">
+      <div class="child-div-class">
+        <div class="label-text">Name: </div><input class="input-style-class" type="text" formControlName="lineName" />
+      </div>
+      <div class="child-div-class">
+        <div class="label-text">Streets near: </div>
+<!--        <textarea class="input-style-class" readonly name="Text1" cols="30" rows="5" [value]="listOfStreets"></textarea><br/>-->
+        <div style="display: grid; text-align: left;">
+          <div *ngFor="let items of listOfStreets;let i=index">
+            <span >
+              {{items}}
+            </span>
+          </div>
+        </div>
+      </div>
+      <div class="child-div-class">
+        <div class="label-text">Start: </div><input class="input-style-class" type="text" [value]="startPointForm | json"/>
+      </div>
+      <div class="child-div-class">
+        <div class="label-text">End: </div><input class="input-style-class" type="text" [value]="endPointForm | json"/>
+      </div>
+    </div>
+    <hr>
+    Tolerance:
+    <input
+      formControlName="toleranceLineForm"
+      [value]="toleranceLineForm"
+      type="range"
+      (change)="sizeTolerance()"
+      min="1"
+      max="10"
+      step="1"
+      value="1"
+    />
+    <p class="text-center">{{ this.toleranceLineMeterForm }}</p>
+    <hr>
+    <br/>
+    <!-- <input type="text" readonly id="selectedPlaces" /><br /> -->
+    <textarea name="Text1" cols="30" rows="5" [value]="selectedPlacesForm"></textarea><br/>
+    <button type="submit" *ngIf="isNewLine" [disabled]="saveLineForm.invalid">Save</button>
+    <button id="cancelbutton" *ngIf="isNewLine" (click)="onCancelSaveLine()">Cancel</button>
+  </form>
+
+  <form *ngIf="isEditLine" [formGroup]="editLineForm" (ngSubmit)="onSubmitEdit()">
+    <div class="parent-div-class">
+      <div class="child-div-class">
+        <div class="label-text">Name: </div><input class="input-style-class" type="text" formControlName="lineName" />
+      </div>
+      <div class="child-div-class">
+        <div class="label-text">Start: </div><input class="input-style-class" type="text" [value]="startPointForm | json"/>
+      </div>
+      <div class="child-div-class">
+        <div class="label-text">End: </div><input class="input-style-class" type="text" [value]="endPointForm | json"/>
+      </div>
+    </div>
+    <hr>
+    Tolerance:
+    <input
+      formControlName="toleranceLineForm"
+      [value]="toleranceLineForm"
+      type="range"
+      (change)="sizeTolerance()"
+      min="1"
+      max="10"
+      step="1"
+      value="1"
+    />
+    <p class="text-center">{{ this.toleranceLineMeterForm }}</p>
+    <hr>
+    <br/>
+    <!-- <input type="text" readonly id="selectedPlaces" /><br /> -->
+    <textarea name="Text1" cols="30" rows="5" [value]="selectedPlacesForm"></textarea><br/>
+    <button type="submit" id="savebutton" *ngIf="isEditLine" [disabled]="editLineForm.invalid">Update</button>
+    <button *ngIf="isEditLine" (click)="onCancelLine()">Cancel</button>
+  </form>
+
+  <div *ngIf="isPreview">
+    Name: "{{this.selectedLineObject.lineName}}"<br/>
+
+    Start: {{this.selectedLineObject.lineCoordinates.start  | json}} <br/>
+    End: {{this.selectedLineObject.lineCoordinates.end  | json}} <br/>
+    <hr>
+    Tolerance: {{this.selectedLineObject.lineTolerance}}<br/>
+    <p class="text-center">{{ this.selectedLineObject.lineTolerance * this.toleranceParamStart + 'm' }}</p>
+    <hr>
+    <br/>
+    <!-- <input type="text" readonly id="selectedPlaces" /><br /> -->
+    {{this.selectedPlacesForm}}<br/>
+    <button type="submit" id="editbutton" *ngIf="isPreview" (click)="onEditLine()">Edit</button>
+    <button type="submit" id="removebutton" *ngIf="isPreview" (click)="onRemoveLine()">Remove</button>
+    <button *ngIf="isPreview" (click)="onCancelLine()">Cancel</button>
+  </div>
+  <!--  <button (click)="onSetCenterMap()">Set map center</button>-->
+  <button (click)="onGetCenterMap()">Get map center</button>
+
+  <button id="newlinebutton" *ngIf="!isNewLine" (click)="onAddNewLine()">New line</button>
+  <!--  <button id="editbutton" onclick="onEditLine()">Edit line</button>-->
+  <!--  <button id="removebutton" onclick="onRemoveLine()">Remove selected line</button>-->
+</div>
+<!--<router-outlet></router-outlet>-->
