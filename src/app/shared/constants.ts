@@ -2,16 +2,16 @@ import { environment } from '../../environments/environment';
 
 const SERVERS = {
   DEV: {
-    host: 'localhost:3000/api',
+    host: '/api',
     protocol: 'http://'
   },
   STAGE: {
-    host: 'https://ec2-52-28-121-87.eu-central-1.compute.amazonaws.com/api',
-    protocol: 'https://'
+    host: 'http://18.184.48.155:3000/api',
+    protocol: 'http://'
   },
   LIVE: {
-    host: 'https://ec2-52-28-121-87.eu-central-1.compute.amazonaws.com/api',
-    protocol: 'https://'
+    host: 'http://18.184.48.155:3000/api',
+    protocol: 'http://'
   }
 };
 
