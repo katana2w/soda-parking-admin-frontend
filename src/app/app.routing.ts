@@ -13,4 +13,6 @@ const routes: Routes = [
     { path: '**', redirectTo: '' }
 ];
 
-export const appRoutingModule = RouterModule.forRoot(routes);
+export const appRoutingModule = RouterModule.forRoot(routes,  {
+    onSameUrlNavigation: 'reload'
+});

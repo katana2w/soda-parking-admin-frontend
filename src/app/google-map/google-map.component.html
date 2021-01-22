@@ -93,11 +93,5 @@
     <button type="submit" id="removebutton" *ngIf="isPreview" (click)="onRemoveLine()">Remove</button>
     <button *ngIf="isPreview" (click)="onCancelLine()">Cancel</button>
   </div>
-  <!--  <button (click)="onSetCenterMap()">Set map center</button>-->
-  <button (click)="onGetCenterMap()">Get map center</button>
-
-  <button id="newlinebutton" *ngIf="!isNewLine" (click)="onAddNewLine()">New line</button>
-  <!--  <button id="editbutton" onclick="onEditLine()">Edit line</button>-->
-  <!--  <button id="removebutton" onclick="onRemoveLine()">Remove selected line</button>-->
+  <button id="newlinebutton" *ngIf="!isNewLine && !isEditLine" (click)="onAddNewLine()">New line</button>
 </div>
-<!--<router-outlet></router-outlet>-->
