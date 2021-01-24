@@ -3,18 +3,10 @@
   <form *ngIf="isNewLine" [formGroup]="saveLineForm" (ngSubmit)="onSubmitSave()">
     <div class="parent-div-class">
       <div class="child-div-class">
-        <div class="label-text">Name: </div><input class="input-style-class" type="text" formControlName="lineName" />
-      </div>
-      <div class="child-div-class">
-        <div class="label-text">Streets near: </div>
-<!--        <textarea class="input-style-class" readonly name="Text1" cols="30" rows="5" [value]="listOfStreets"></textarea><br/>-->
-        <div style="display: grid; text-align: left;">
-          <div *ngFor="let items of listOfStreets;let i=index">
-            <span >
-              {{items}}
-            </span>
-          </div>
-        </div>
+        <div class="label-text">Name: </div><input class="input-style-class" type="text" list="streetsNear" [value]="lineName" formControlName="lineName" />
+        <datalist id="streetsNear">
+          <option *ngFor="let valore of listOfStreets" [value]="valore"></option>
+        </datalist>
       </div>
       <div class="child-div-class">
         <div class="label-text">Start: </div><input class="input-style-class" type="text" [value]="startPointForm | json"/>

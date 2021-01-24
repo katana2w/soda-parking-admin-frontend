@@ -1,6 +1,6 @@
 import {Component, OnInit, AfterViewInit, ViewChild, ElementRef, Inject, EventEmitter} from '@angular/core';
 import {FormBuilder, FormGroup, FormControl, Validators} from '@angular/forms';
-import { DOCUMENT } from '@angular/common';
+import {DOCUMENT} from '@angular/common';
 import {LineService} from '../_services';
 import {ApiService} from '../_services';
 
@@ -8,7 +8,7 @@ import {Line} from '../shared/types';
 
 import {MatDialog, MatDialogConfig} from '@angular/material/dialog';
 import {DialogMessageComponent} from '../dialog-message/dialog-message.component';
-import { Router } from '@angular/router';
+import {Router} from '@angular/router';
 
 @Component({
     selector: 'app-google-map',
@@ -23,7 +23,7 @@ export class GoogleMapComponent implements OnInit, AfterViewInit {
     markersStartEnd: Array<any> = [];
     parkingCircleArray: Array<any> = [];
     parkingPlaces: Array<any> = [];
-    polylinesArray: Array<any> = [];
+    polylinesArray: any = {};
     listOfStreets: string[] = [];
     parkingCircleObjects: any = {};
     selectedLineObject: Line;
@@ -60,6 +60,10 @@ export class GoogleMapComponent implements OnInit, AfterViewInit {
     private editLineForm: FormGroup;
     onClickChangeSelectedLine = this.clickChangeSelectedLine.bind(this);
     isLoading = true;
+    lineName = '';
+
+    latCenter = 47.49219219532645;
+    lngCenter = 19.05507372045515;
 
     constructor(
         public lineService: LineService,
@@ -125,8 +129,8 @@ export class GoogleMapComponent implements OnInit, AfterViewInit {
         this.map = new google.maps.Map(this.gmap.nativeElement, {
             zoom: 19,
             center: {
-                lat: 47.49219219532645,
-                lng: 19.05507372045515,
+                lat: this.latCenter,
+                lng: this.lngCenter,
             },
         });
         this.map.setOptions({
@@ -144,13 +148,20 @@ export class GoogleMapComponent implements OnInit, AfterViewInit {
         });
         this.setMapOnAll(null);
         this.geocoder = new google.maps.Geocoder();
+        this.map.addListener('center_changed', () => {
+            // 3 seconds after the center of the map has changed, pan back to the
+            // marker.
+            this.latCenter = this.map.getCenter().lat();
+            this.lngCenter = this.map.getCenter().lng();
+        });
     }
 
     geocodeLatLng(): void {
         this.geocoder.geocode({location: this.marker1.getPosition()}, (results, status) => {
             if (status === 'OK') {
+                // @ts-ignore
                 // tslint:disable-next-line:max-line-length
-                this.listOfStreets = results.filter(item => item.types.includes('street_address')).map(it => it.address_components.filter(tt => tt.types.includes('route'))).map(kk => kk[0].long_name);
+                this.listOfStreets = [...new Set(results.filter(item => item.types.includes('street_address')).map(it => it.address_components.filter(tt => tt.types.includes('route'))).map(kk => kk[0].long_name))];
             } else {
                 console.log('Geocoder failed due to: ' + status);
             }
@@ -167,12 +178,18 @@ export class GoogleMapComponent implements OnInit, AfterViewInit {
     }
 
     createAllLinesOnMap(linesArray = this.linesSavedArray): void {
-        this.polylinesArray.forEach(poly => {
-            poly.setMap(null);
-        });
-        linesArray.forEach(line => {
-            this.createLineBasedObject(line);
-        });
+        // tslint:disable-next-line:prefer-for-of
+        for (const item in this.polylinesArray) {
+            if (this.polylinesArray[this.polylinesArray]) {
+                this.polylinesArray[this.polylinesArray].setMap(null);
+                this.polylinesArray[this.polylinesArray] = null;
+            }
+        }
+        this.polylinesArray = {};
+        for (let i = 0; i < linesArray.length; i++) {
+            this.createLineBasedObject(linesArray[i]);
+
+        }
     }
 
     createLineBasedObject(line: Line): void {
@@ -182,9 +199,9 @@ export class GoogleMapComponent implements OnInit, AfterViewInit {
             path: [line.lineCoordinates.start, line.lineCoordinates.end],
             strokeColor: this.defaultColors.defaultLine.lineColor,
             strokeOpacity: 1.0,
-            strokeWeight: 12
+            strokeWeight: 8
         });
-        this.polylinesArray.push(newLine);
+        this.polylinesArray[line._id] = newLine;
         newLine.addListener('click', this.onClickChangeSelectedLine.bind(null, event, newLine, line, line.lineScanners));
         line.lineScanners.forEach((scanner: any) => {
             const idParking = scanner.ParkingPlaceId;
@@ -223,7 +240,9 @@ export class GoogleMapComponent implements OnInit, AfterViewInit {
         }
         this.deleteMarkers();
         this.clearPolyline();
-        this._document.defaultView.location.reload();
+        if (!this.isPreview) {
+            this.reloadMap();
+        }
     }
 
     onCancelSaveLine(): void {
@@ -240,7 +259,7 @@ export class GoogleMapComponent implements OnInit, AfterViewInit {
         this.deleteMarkers();
         this.clearPolyline();
         // this.deleteLineAndPassDefaultColor();
-        this._document.defaultView.location.reload();
+        this.reloadMap();
     }
 
     newLineOnMap2(): void {
@@ -295,6 +314,7 @@ export class GoogleMapComponent implements OnInit, AfterViewInit {
         // remove the polyline from map before we draw new one
         if (this.selectedPolylineObject) {
             this.selectedPolylineObject.setMap(null);
+            this.selectedPolylineObject = null;
         }
 
         // draw new polyline at markers' position
@@ -461,41 +481,43 @@ export class GoogleMapComponent implements OnInit, AfterViewInit {
     }
 
     clickChangeSelectedLine(param1: any, polyLine: any, line: Line, lineScanners: []): void {
-        if (this.selectedPolylineObject) {
-            this.selectedPolylineObject.setOptions({
-                fillColor: this.defaultColors.defaultLine.lineColor,
-                strokeColor: this.defaultColors.defaultLine.lineColor
-            });
-        }
-        if (this.selectedLineScanners && this.selectedLineScanners.length > 0) {
-            this.selectedLineScanners.forEach((scanner: any) => {
+        if (!this.isEditLine && !this.isNewLine) {
+            if (this.selectedPolylineObject) {
+                this.selectedPolylineObject.setOptions({
+                    fillColor: this.defaultColors.defaultLine.lineColor,
+                    strokeColor: this.defaultColors.defaultLine.lineColor
+                });
+            }
+            if (this.selectedLineScanners && this.selectedLineScanners.length > 0) {
+                this.selectedLineScanners.forEach((scanner: any) => {
+                    const idParking = scanner.ParkingPlaceId;
+                    const circle = this.parkingCircleObjects[idParking];
+                    if (circle) {
+                        circle.setOptions({
+                            fillColor: this.defaultColors.defaultLine.scannerColor,
+                            strokeColor: this.defaultColors.defaultLine.scannerColor
+                        });
+                    }
+                });
+            }
+            this.isPreview = true;
+            this.selectedLineScanners = lineScanners;
+            this.selectedPolylineObject = polyLine;
+            this.selectedLineObject = line;
+            polyLine.setOptions({strokeColor: this.defaultColors.selectedLine.lineColor});
+            lineScanners.forEach((scanner: any) => {
                 const idParking = scanner.ParkingPlaceId;
                 const circle = this.parkingCircleObjects[idParking];
                 if (circle) {
                     circle.setOptions({
-                        fillColor: this.defaultColors.defaultLine.scannerColor,
-                        strokeColor: this.defaultColors.defaultLine.scannerColor
+                        fillColor: this.defaultColors.selectedLine.scannerColor,
+                        strokeColor: this.defaultColors.selectedLine.scannerColor
                     });
                 }
             });
+            this.selectedLineScanners = lineScanners;
+            this.selectedLineObject = line;
         }
-        this.isPreview = true;
-        this.selectedLineScanners = lineScanners;
-        this.selectedPolylineObject = polyLine;
-        this.selectedLineObject = line;
-        polyLine.setOptions({strokeColor: this.defaultColors.selectedLine.lineColor});
-        lineScanners.forEach((scanner: any) => {
-            const idParking = scanner.ParkingPlaceId;
-            const circle = this.parkingCircleObjects[idParking];
-            if (circle) {
-                circle.setOptions({
-                    fillColor: this.defaultColors.selectedLine.scannerColor,
-                    strokeColor: this.defaultColors.selectedLine.scannerColor
-                });
-            }
-        });
-        this.selectedLineScanners = lineScanners;
-        this.selectedLineObject = line;
     }
 
     // Removes the markers from the map, but keeps them in the array.
@@ -508,11 +530,13 @@ export class GoogleMapComponent implements OnInit, AfterViewInit {
         // tslint:disable-next-line:no-unused-expression
         if (this.selectedPolylineObject) {
             this.selectedPolylineObject.setMap(null);
+            this.selectedPolylineObject = null;
         }
         // tslint:disable-next-line:no-unused-expression
         if (this.selectedLineObject && this.selectedLineObject.linePoly) {
             // @ts-ignore
             this.selectedLineObject.linePoly.setMap(null);
+            this.selectedLineObject.linePoly = null;
         }
     }
 
@@ -588,8 +612,12 @@ export class GoogleMapComponent implements OnInit, AfterViewInit {
     }
 
     removingListeners() {
-        google.maps.event.clearInstanceListeners(this.marker1);
-        google.maps.event.clearInstanceListeners(this.marker2);
+        if (this.marker1) {
+            google.maps.event.clearInstanceListeners(this.marker1);
+        }
+        if (this.marker2) {
+            google.maps.event.clearInstanceListeners(this.marker2);
+        }
         google.maps.event.clearInstanceListeners(this.map);
     }
 
@@ -633,6 +661,11 @@ export class GoogleMapComponent implements OnInit, AfterViewInit {
         });
         if (this.selectedPolylineObject) {
             this.selectedPolylineObject.setMap(null);
+            this.selectedPolylineObject = null;
+            if (this.polylinesArray[this.selectedLineObject._id]) {
+                this.polylinesArray[this.selectedLineObject._id].setMap(null);
+                this.polylinesArray[this.selectedLineObject._id] = null;
+            }
         }
         if (this.marker1) {
             this.startPointForm = String(this.marker1.getPosition());
@@ -664,25 +697,44 @@ export class GoogleMapComponent implements OnInit, AfterViewInit {
             this.formatLineObject();
             this.registered = true;
             this.apiService.saveLineDb(this.selectedLineObject).subscribe(data => {
-                    if (data && data.message === 'Ok') {
-                        this.removingListeners();
-                        this.deleteMarkers();
-                        this.createAllLinesOnMap([data.result]);
-                        this.isNewLine = false;
-                        this.isPreview = true;
-                    } else if (data && data.message === 'Error') {
-                        this.clearPolyline();
-                        this.drawPolyline();
-                        if (data.err.keyPattern.lineName) {
-                            this.openDialog(`Line with name "${data.err.keyValue.lineName}" already exists!`);
+                    this.apiService.getLinesFromDb().subscribe(resp => {
+                        this.linesSavedArray = resp.allLinesObject;
+                        if (data && data.message === 'Ok') {
+                            this.removingListeners();
+                            this.deleteMarkers();
+                            this.createAllLinesOnMap();
+                            this.selectedPolylineObject.setMap(null);
+                            this.selectedPolylineObject = null;
+                            this.selectedLineObject = null;
+                            this.isNewLine = false;
+                            this.isPreview = false;
+                        } else if (data && data.message === 'Error') {
+                            this.clearPolyline();
+                            this.drawPolyline();
+                            if (data.err.keyPattern.lineName) {
+                                this.openDialog(`Line with name "${data.err.keyValue.lineName}" already exists!`);
+                            }
                         }
-                    }
-                    this._document.defaultView.location.reload();
+                    });
                 },
                 error => {
                     this._document.defaultView.location.reload();
                 });
         }
+    }
+
+    reloadMap(): void {
+        this.map = null;
+        this.mapInitializer();
+        this.apiService.getAllScannersFromUrl().subscribe(data => {
+            this.parkingPlaces = data.response;
+            this.getParkingPoints();
+            this.apiService.getLinesFromDb().subscribe(resp => {
+                this.linesSavedArray = resp.allLinesObject;
+                this.createAllLinesOnMap();
+                this.isLoading = true;
+            });
+        });
     }
 
     onSubmitEdit() {
@@ -700,10 +752,11 @@ export class GoogleMapComponent implements OnInit, AfterViewInit {
                     this.isEditLine = false;
                     this.clearPolyline();
                     this.deleteMarkers();
-                    this.createAllLinesOnMap();
+                    this.createAllLinesOnMap([this.selectedLineObject]);
                     this.clearSelectedLineObjects();
                     // this.createAllLinesOnMap();
-                    this._document.defaultView.location.reload();
+                    // this._document.defaultView.location.reload();
+                    // this.reloadMap();
                 });
             });
         }
@@ -711,15 +764,34 @@ export class GoogleMapComponent implements OnInit, AfterViewInit {
 
     onRemoveLine(): void {
         if (this.selectedLineObject._id) {
+            const lineScannersUnsuedColor = this.selectedLineObject.lineScanners;
             this.apiService.removeLineFromDb(this.selectedLineObject).subscribe(data => {
                 this.apiService.getLinesFromDb().subscribe(resp => {
                     this.isPreview = false;
+                    this.linesSavedArray = resp.allLinesObject;
+                    lineScannersUnsuedColor.forEach((item: any) => {
+                        const id = item.ParkingPlaceId;
+                        const cityCircle = this.parkingCircleObjects[id];
+
+                        // @ts-ignore
+                        if (cityCircle.strokeColor === 'red' && cityCircle.fillColor === 'red') {
+                            cityCircle.setOptions({
+                                fillColor: this.defaultColors.unselectedScanners,
+                                strokeColor: this.defaultColors.unselectedScanners
+                            });
+                        }
+                    });
+                    if (this.polylinesArray[this.selectedLineObject._id]) {
+                        this.polylinesArray[this.selectedLineObject._id].setMap(null);
+                        this.polylinesArray[this.selectedLineObject._id] = null;
+                    }
                     this.clearPolyline();
                     this.deleteMarkers();
                     this.clearSelectedLineObjects();
-                    this.linesSavedArray = resp.allLinesObject;
-                    // this.createAllLinesOnMap();
-                    this._document.defaultView.location.reload();
+                    this.removingListeners();
+                    this.selectedLineObject = null;
+                    this.selectedPolylineObject = null;
+                    this.selectedLineScanners = null;
                 });
             });
         }
