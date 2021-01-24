@@ -1,12 +1,6 @@
-<h5 mat-dialog-title>{{description}}</h5>
-<!--<mat-dialog-content [formGroup]="form">-->
-<!--  <mat-form-field>-->
-<!--    <div matInput-->
-<!--           placeholder="Course Description"-->
-<!--         formControlName="description"></div>-->
-<!--  </mat-form-field>-->
-<!--</mat-dialog-content>-->
-<mat-dialog-actions>
-  <button class="mat-raised-button" (click)="close()">Close</button>
-<!--  <button class="mat-raised-button mat-primary" (click)="save()">Save</button>-->
+<mat-dialog-content>
+  {{description}}
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-raised-button color="primary" mat-dialog-close tabindex="-1" (click)="close()">Close</button>
 </mat-dialog-actions>

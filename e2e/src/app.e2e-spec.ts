@@ -10,7 +10,7 @@ describe('workspace-project App', () => {
 
   it('should display welcome message', () => {
     page.navigateTo();
-    expect(page.getTitleText()).toEqual('Welcome to angular-8-basic-authentication-example!');
+    expect(page.getTitleText()).toEqual('Welcome to soda-parking-admin-panel!');
   });
 
   afterEach(async () => {

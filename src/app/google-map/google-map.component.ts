@@ -1,6 +1,6 @@
 import {Component, OnInit, AfterViewInit, ViewChild, ElementRef, Inject, EventEmitter} from '@angular/core';
 import {FormBuilder, FormGroup, FormControl, Validators} from '@angular/forms';
-import {DOCUMENT} from '@angular/common';
+// import {DOCUMENT} from '@angular/common';
 import {LineService} from '../_services';
 import {ApiService} from '../_services';
 
@@ -69,9 +69,7 @@ export class GoogleMapComponent implements OnInit, AfterViewInit {
         public lineService: LineService,
         private apiService: ApiService,
         private formBuilder: FormBuilder,
-        public dialog: MatDialog,
-        private router: Router,
-        @Inject(DOCUMENT) private _document: Document
+        public dialog: MatDialog
     ) {
         this.saveLineForm = new FormGroup({
             lineName: new FormControl(),
@@ -186,9 +184,9 @@ export class GoogleMapComponent implements OnInit, AfterViewInit {
             }
         }
         this.polylinesArray = {};
+        // tslint:disable-next-line:prefer-for-of
         for (let i = 0; i < linesArray.length; i++) {
             this.createLineBasedObject(linesArray[i]);
-
         }
     }
 
@@ -228,20 +226,28 @@ export class GoogleMapComponent implements OnInit, AfterViewInit {
     }
 
     onCancelLine(): void {
-        this.isLoading = false;
-        this.isNewLine = false;
-        this.isPreview = false;
-        this.isEditLine = false;
-        if (this.marker1) {
-            google.maps.event.clearInstanceListeners(this.marker1);
-        }
-        if (this.marker2) {
-            google.maps.event.clearInstanceListeners(this.marker2);
-        }
-        this.deleteMarkers();
-        this.clearPolyline();
-        if (!this.isPreview) {
-            this.reloadMap();
+        if (!this.isNewLine && !this.isEditLine && this.isPreview) {
+            this.isLoading = false;
+            this.isNewLine = false;
+            this.isPreview = false;
+            this.isEditLine = false;
+            this.makeSelectedLineDefaultColors();
+        } else {
+            this.isLoading = false;
+            this.isNewLine = false;
+            this.isPreview = false;
+            this.isEditLine = false;
+            if (this.marker1) {
+                google.maps.event.clearInstanceListeners(this.marker1);
+            }
+            if (this.marker2) {
+                google.maps.event.clearInstanceListeners(this.marker2);
+            }
+            this.deleteMarkers();
+            this.clearPolyline();
+            if (!this.isPreview) {
+                this.reloadMap();
+            }
         }
     }
 
@@ -718,7 +724,7 @@ export class GoogleMapComponent implements OnInit, AfterViewInit {
                     });
                 },
                 error => {
-                    this._document.defaultView.location.reload();
+                    this.reloadMap();
                 });
         }
     }
@@ -801,29 +807,13 @@ export class GoogleMapComponent implements OnInit, AfterViewInit {
         this.map.setCenter(new google.maps.LatLng(47.49219219532645, 19.05507372045515));
     }
 
-    openDialog(textMessage) {
-        const dialogConfig = new MatDialogConfig();
-
-        dialogConfig.disableClose = false;
-        dialogConfig.autoFocus = true;
-        dialogConfig.data = {
-            id: 1,
-            title: 'Angular For Beginners',
-            description: textMessage
-        };
-        dialogConfig.position = {
-            top: '0',
-            left: '0'
-        };
-        const dialogRef = this.dialog.open(DialogMessageComponent, dialogConfig);
-
-        dialogRef.afterClosed().subscribe(result => {
-            console.log(`Dialog result: ${result}`);
+    openDialog(textMessage): void {
+        const dialogRef = this.dialog.open(DialogMessageComponent, {
+            width: '500px',
+            data: {
+                description: textMessage
+            },
         });
-
-        dialogRef.afterClosed().subscribe(
-            data => console.log('Dialog output:', data)
-        );
     }
 
     onGetCenterMap(): void {

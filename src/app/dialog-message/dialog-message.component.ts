@@ -1,34 +1,24 @@
-import {Component, Inject, OnInit} from '@angular/core';
+import {Component, Inject} from '@angular/core';
 import {MAT_DIALOG_DATA, MatDialogRef} from '@angular/material';
-import {FormBuilder, FormGroup} from '@angular/forms';
 
 @Component({
   selector: 'app-dialog-message',
   templateUrl: './dialog-message.component.html',
   styleUrls: ['./dialog-message.component.less']
 })
-export class DialogMessageComponent implements OnInit {
-  form: FormGroup;
+export class DialogMessageComponent {
   description: string;
 
   constructor(
-    private fb: FormBuilder,
-    private dialogRef: MatDialogRef<DialogMessageComponent>,
-    @Inject(MAT_DIALOG_DATA) data) {
-    this.description = data.description;
+      @Inject(MAT_DIALOG_DATA) private data: any,
+      private dialogRef: MatDialogRef<DialogMessageComponent>) {
+    if (data) {
+      this.description = data.description || this.description;
+    }
+    this.dialogRef.updateSize('300vw', '300vw');
   }
 
-  ngOnInit() {
-    this.form = this.fb.group({
-      description: [this.description, []]
-    });
-  }
-
-  save() {
-    this.dialogRef.close(this.form.value);
-  }
-
-  close() {
-    this.dialogRef.close();
+  close(): void {
+    this.dialogRef.close(true);
   }
 }
