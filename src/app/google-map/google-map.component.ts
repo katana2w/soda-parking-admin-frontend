@@ -28,7 +28,7 @@ export class GoogleMapComponent implements OnInit, AfterViewInit {
     parkingCircleObjects: any = {};
     selectedLineObject: Line;
     selectedPolylineObject: any;
-    selectedLineScanners: [];
+    selectedLineScanners: Array<object>;
     linesSavedArray: Array<Line> = null;
 
     defaultColors = {
@@ -109,7 +109,7 @@ export class GoogleMapComponent implements OnInit, AfterViewInit {
         });
 
         // @ts-ignore
-        google.maps.Polyline.prototype.getBounds = function () {
+        google.maps.Polyline.prototype.getBounds = function() {
             const bounds = new google.maps.LatLngBounds();
             // tslint:disable-next-line:only-arrow-functions
             this.getPath().forEach((item, index) => {
@@ -758,8 +758,14 @@ export class GoogleMapComponent implements OnInit, AfterViewInit {
                     this.isEditLine = false;
                     this.clearPolyline();
                     this.deleteMarkers();
+                    // lineScanners update
+                    const updateElementIndex = this.linesSavedArray.findIndex(item => item._id === this.selectedLineObject._id);
+                    if (updateElementIndex === 0 || updateElementIndex > 0) {
+                        this.linesSavedArray[updateElementIndex].lineScanners = this.selectedLineObject.lineScanners;
+                        this.selectedLineScanners = this.selectedLineObject.lineScanners;
+                    }
                     this.createAllLinesOnMap([this.selectedLineObject]);
-                    this.clearSelectedLineObjects();
+                    // this.clearSelectedLineObjects();
                     // this.createAllLinesOnMap();
                     // this._document.defaultView.location.reload();
                     // this.reloadMap();
