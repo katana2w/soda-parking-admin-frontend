@@ -1,0 +1,12 @@
+# package directories
+node_modules
+
+# Webpack directories
+.build
+
+dist
+
+.idea
+
+.eslintcache
+/dist/

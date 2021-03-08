@@ -1,8 +1,26 @@
-﻿<nav class="navbar navbar-expand-sm bg-dark navbar-dark justify-content-end" *ngIf="currentUser">
-  <span class="navbar-brand align-middle">Parker app Admin</span>
-  <button class="btn btn-success ml-auto mr-1" (click)="logout()">Logout</button>
+﻿<nav class="navbar navbar-expand-md navbar-dark bg-dark">
+    <div class="navbar-collapse collapse w-100 order-1 order-md-0 dual-collapse2">
+    </div>
+    <div class="mx-auto order-0">
+        <a class="navbar-brand mx-auto" href="#">Parker app Admin</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target=".dual-collapse2">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+    </div>
+    <div class="navbar-collapse collapse w-100 order-3 dual-collapse2">
+        <ul class="navbar-nav ml-auto">
+            <li class="nav-item">
+                <button class="btn btn-info ml-auto mr-1" (click)="map()">Map</button>
+            </li>
+            <li class="nav-item">
+                <button class="btn btn-info ml-auto mr-1" (click)="rules()">Rules</button>
+            </li>
+            <li class="nav-item">
+                <button class="btn btn-danger ml-auto mr-1" (click)="logout()">Logout</button>
+            </li>
+        </ul>
+    </div>
 </nav>
-<!-- main app container -->
 <div class="container-map">
     <router-outlet></router-outlet>
 </div>

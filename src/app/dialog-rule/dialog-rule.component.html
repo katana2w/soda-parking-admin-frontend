@@ -1,0 +1,32 @@
+<div class="floating-panel">
+    <form [formGroup]="saveRuleForm" (ngSubmit)="onSubmitSave()">
+        <div class="parent-div-class">
+            <div class="child-div-class">
+                <div class="label-text">Rule name: </div>
+                <select [(ngModel)]='ruleName' class='form-control' formControlName="ruleName">
+                    <option value='RULE_A'>Rule A</option>
+                    <option value='RULE_B'>Rule B</option>
+                    <option value='RULE_C'>Rule C</option>
+                </select>
+            </div>
+            <div class="child-div-class">
+                <div class="label-text">RED, To: </div><input class="form-control" type="number" [value]="ruleRedTo" formControlName="ruleRedTo" />
+            </div>
+            <hr />
+            <div class="child-div-class">
+                <div class="label-text">YELLOW, From: </div><input class="form-control" type="number" [value]="ruleYellowFrom" formControlName="ruleYellowFrom" />
+            </div>
+            <div class="child-div-class">
+                <div class="label-text">YELLOW, To: </div><input class="form-control" type="number" [value]="ruleYellowTo" formControlName="ruleYellowTo" />
+            </div>
+            <hr />
+            <div class="child-div-class">
+                <div class="label-text">GREEN, From: </div><input class="form-control" type="number" [value]="ruleGreenFrom" formControlName="ruleGreenFrom" />
+            </div>
+        </div>
+        <br/>
+        <button mat-raised-button *ngIf="isEditRule" color="primary" mat-dialog-close tabindex="-1" (click)="update()">Update</button>
+        <button mat-raised-button *ngIf="isNewRule" color="primary" mat-dialog-close tabindex="-1" type="submit">Save</button>
+        <button mat-raised-button color="primary" mat-dialog-close tabindex="-1" (click)="close()">Close</button>
+    </form>
+</div>

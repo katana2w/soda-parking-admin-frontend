@@ -1,0 +1,20 @@
+<div class="container">
+    <div class="row">
+        <div class="col-12 col-md-12"><br/>
+<!--            <button type="button" class="btn btn-success" (click)="onNewRule()">New rule</button>-->
+            <br/><br/>
+            <mat-nav-list>
+                <h3>Rules list</h3>
+                <a mat-list-item *ngFor="let rule of rulesSavedArray">
+                    <span matLine>{{rule.ruleName === 'RULE_A' ? 'Rule A' : rule.ruleName === 'RULE_B' ? 'Rule B' : 'Rule C'}}</span>
+                    <button mat-icon-button (click)="openRule(rule)">
+                        <mat-icon>edit</mat-icon>
+                    </button>
+<!--                    <button mat-icon-button (click)="onRemove(rule)">-->
+<!--                        <mat-icon>delete</mat-icon>-->
+<!--                    </button>-->
+                </a>
+            </mat-nav-list>
+        </div>
+    </div>
+</div>

@@ -1,4 +1,4 @@
-﻿import { Component } from '@angular/core';
+﻿import {Component} from '@angular/core';
 import { Router } from '@angular/router';
 
 import { AuthenticationService } from './_services';
@@ -20,4 +20,12 @@ export class AppComponent {
         this.authenticationService.logout();
         this.router.navigate(['/login']);
     }
+
+   rules() {
+       this.router.navigate(['/rules']);
+   }
+
+   map() {
+       this.router.navigate(['/']);
+   }
 }

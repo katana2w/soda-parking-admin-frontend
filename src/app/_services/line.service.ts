@@ -1,7 +1,5 @@
 import { Injectable } from '@angular/core';
-import { Line } from '../shared/types';
 import { ApiService } from './api.service';
-import {Observable, Subscription} from 'rxjs';
 
 @Injectable({
   providedIn: 'root'

@@ -25,6 +25,12 @@ export class ApiService {
     return this.http.get(`/api/all-lines`);
   }
 
+  getRulesFromDb(): Observable<any> {
+    console.log('GET ALL RULES');
+
+    return this.http.get(`/api/all-rules`);
+  }
+
   getLinesLatLngFromDb(lat1: number, lng1: number, lat2: number, lng2: number): Observable<any> {
     console.log('GET ALL LAT&LNG LINES');
     // tslint:disable-next-line:max-line-length
@@ -36,9 +42,19 @@ export class ApiService {
     return this.http.post('/api/save-line', lineObject);
   }
 
+  public saveRuleDb(lineObject): Observable<any> {
+    console.log('SAVING');
+    return this.http.post('/api/save-rule', lineObject);
+  }
+
   public saveEditLineDb(lineObject): Observable<any> {
     console.log('SAVING EDIT');
     return this.http.put('/api/update-line', lineObject);
+  }
+
+  public saveEditRuleDb(lineObject): Observable<any> {
+    console.log('SAVING EDIT');
+    return this.http.put('/api/update-rule', lineObject);
   }
 
   public removeLineFromDb(lineObject): Observable<any> {
